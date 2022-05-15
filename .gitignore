@@ -1,3 +1,8 @@
+#ignore
+UPS-Lite/
+e-Paper/
+volumio-socket-io/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
