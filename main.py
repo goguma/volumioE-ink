@@ -1,10 +1,16 @@
 import asyncio
 import threading
 import time
+from pprint import pprint
+import requests
+
 from ePaper import ePaper
 from ups import UPS
 
 statusUpdated = threading.Event()
+statusUpdateFlag = False
+statusUpdatelock = threading.Lock()
+volumioStatus = None
 
 class Volumio(threading.Thread):
     def __init__(self, address="localhost", port=3000):
@@ -54,7 +60,13 @@ class Volumio(threading.Thread):
         """
         print("State updated")
         self._state = args[0]
-        print(self._state)
+        # pprint(self._state)
+        global volumioStatus
+        global statusUpdateFlag
+        statusUpdatelock.acquire()
+        volumioStatus = self._state
+        statusUpdateFlag = True
+        statusUpdatelock.release()
 
 
     # def _on_push_browse_library(self, *args):
@@ -206,9 +218,13 @@ class Volumio(threading.Thread):
 #         print("{} is end".format(threading.currentThread().getName()))
 
 def main():
-    msg = "hello"
+    updateScreenFlag = False
+    album = None
+    title = None
+    artist = None
+    albumArtURI = None
 
-    th = Volumio('volumio.local', '3000')
+    th = Volumio('localhost', '3000')
     th.start()  # run()에 구현한 부분이 실행된다
 
     batteryModule = UPS()
@@ -218,16 +234,57 @@ def main():
 
     while True:
         statusUpdated.wait(1)
-        print('get UPS status')
+
+        global statusUpdateFlag
+        global volumioStatus
+
+        if statusUpdateFlag == True:
+            print('volumio status updated')
+            # pprint(volumioStatus)
+            if updateScreenFlag == False:
+                updateScreenFlag = True
+
+            if len(volumioStatus['album']):
+                album = volumioStatus['album']
+            if len(volumioStatus['title']):
+                title = volumioStatus['title']
+            if len(volumioStatus['artist']):
+                artist = volumioStatus['artist']
+            albumArtURI = volumioStatus['albumart']
+
+            if len(album) == 0 or len(title) == 0 or len(artist) == 0:
+                updateScreenFlag = False
+
+            statusUpdatelock.acquire()
+            statusUpdateFlag = False
+            statusUpdatelock.release()
+
         capacity = batteryModule.readCapacity()
+        capacity = round(capacity, 0)
         if lastCapacity != capacity:
             lastCapacity = capacity
             print('capacity : {}'.format(capacity))
             print('update ePaper')
-            screenModule.drawText(0, 0, 8, capacity)
-        else:
-            print('capacity is same')
 
+            if updateScreenFlag == False:
+                updateScreenFlag = True
+
+        if updateScreenFlag == True:
+            screenModule.clearScreen()
+
+            print('albumArtURI : {}'.format(albumArtURI))
+            if (albumArtURI != None and albumArtURI.startswith('http')):
+                screenModule.drawImage(0, 0, 96, 96, requests.get(albumArtURI, stream=True).raw)
+
+            screenModule.drawText(100, 0, 15, album)
+            screenModule.drawText(100, 30, 24, title)
+            screenModule.drawText(100, 60, 15, artist)
+
+            capacity = 'BAT : {}%'.format(capacity)
+            screenModule.drawText(185, 100, 15, capacity)
+
+            screenModule.flush()
+            updateScreenFlag = False
     th.join()
 
 if __name__ == "__main__":
