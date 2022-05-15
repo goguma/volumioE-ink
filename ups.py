@@ -6,7 +6,7 @@ import time
 import RPi.GPIO as GPIO
 
 class UPS:
-    def __init(self):
+    def __init__(self):
         GPIO.setmode(GPIO.BCM)
         GPIO.setwarnings(False)
         GPIO.setup(4,GPIO.IN)

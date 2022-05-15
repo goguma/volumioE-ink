@@ -16,7 +16,7 @@ import traceback
 logging.basicConfig(level=logging.DEBUG)
 
 class ePaper:
-    def __init(self):
+    def __init__(self):
         logging.info("epd2in13_V3 Demo")
     
         self.epd = epd2in13_V3.EPD()
